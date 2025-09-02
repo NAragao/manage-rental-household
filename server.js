@@ -20,7 +20,8 @@ app.get('/api/firebase-config', (req, res) => {
         storageBucket: process.env.STORAGE_BUCKET,
         messagingSenderId: process.env.MESSAGING_SENDER_ID,
         appId: process.env.APP_ID,
-        measurementId: process.env.MEASUREMENT_ID
+        measurementId: process.env.MEASUREMENT_ID,
+        n8nWebhookUrl: process.env.N8N_WEBHOOK_URL
     });
 });
 
