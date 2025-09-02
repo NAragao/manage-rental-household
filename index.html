@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Gestão da Casa</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; }
+        .nav-link, .btn { cursor: pointer; }
+        #login-container { min-height: 100vh; }
+    </style>
+</head>
+<body>
+    <div id="app-container" class="d-none"></div>
+
+    <div id="login-container" class="d-flex align-items-center justify-content-center">
+        <div class="card shadow-sm" style="width: 22rem;">
+            <div class="card-body p-4">
+                <h1 class="h3 mb-3 fw-normal text-center">Gestão da Casa</h1>
+                <form id="login-form">
+                    <div class="form-floating mb-3">
+                        <input type="email" class="form-control" id="login-email" placeholder="name@example.com" required>
+                        <label for="login-email">Email</label>
+                    </div>
+                    <div class="form-floating mb-3">
+                        <input type="password" class="form-control" id="login-password" placeholder="Password" required>
+                        <label for="login-password">Password</label>
+                    </div>
+                    <button class="w-100 btn btn-lg btn-primary" type="submit">Entrar</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div id="toast-container" class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div id="app-toast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header"><strong class="me-auto">Notificação</strong><button type="button" class="btn-close" data-bs-dismiss="toast"></button></div>
+            <div class="toast-body"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, getDoc, getDocs, query, where, writeBatch, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        const appHTML = `
+            <div class="container mt-4">
+                <header class="p-3 mb-4 border-bottom d-flex justify-content-between align-items-center"><h1 class="h3 mb-0">Gestão da Casa</h1><div id="user-info"><span id="user-email" class="me-3 text-muted"></span><button id="logout-btn" class="btn btn-outline-danger btn-sm">Logout</button></div></header>
+                <ul class="nav nav-tabs" id="myTab" role="tablist">
+                    <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-dashboard" type="button"><i class="bi bi-speedometer2 me-2"></i>Dashboard</button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-inquilinos" type="button"><i class="bi bi-people-fill me-2"></i>Inquilinos</button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-quartos" type="button"><i class="bi bi-door-open-fill me-2"></i>Quartos</button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-relatorio" type="button"><i class="bi bi-journal-text me-2"></i>Relatório de Despesas</button></li>
+                </ul>
+                <div class="tab-content p-3" id="myTabContent">
+                    <div class="tab-pane fade show active" id="tab-dashboard" role="tabpanel"> <div class="card shadow-sm"><div class="card-header d-flex justify-content-between align-items-center flex-wrap"><h2 class="h5 mb-0 me-3">Relatórios Mensais</h2><div class="d-flex align-items-center gap-2 mt-2 mt-md-0"><select id="year-filter" class="form-select form-select-sm" style="width: auto;"></select><select id="month-filter" class="form-select form-select-sm" style="width: auto;"><option value="1">Jan</option><option value="2">Fev</option><option value="3">Mar</option><option value="4">Abr</option><option value="5">Mai</option><option value="6">Jun</option><option value="7">Jul</option><option value="8">Ago</option><option value="9">Set</option><option value="10">Out</option><option value="11">Nov</option><option value="12">Dez</option></select><button id="generate-reports-btn" class="btn btn-primary btn-sm" title="Calcular & Gerar Relatórios"><i class="bi bi-calculator"></i></button><button id="email-reports-btn" class="btn btn-info btn-sm" title="Enviar Email Despesas"><i class="bi bi-send"></i></button></div></div><div class="card-body"><div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Inquilino</th><th>Mês</th><th class="text-end">Renda</th><th class="text-end">Gás</th><th class="text-end">Água</th><th class="text-end">Eletricidade</th><th class="text-end">Total</th><th class="text-center">Estado</th><th class="text-center">Email Enviado</th><th class="text-end">Ações</th></tr></thead><tbody id="reports-table-body"></tbody></table></div></div></div></div>
+                    <div class="tab-pane fade" id="tab-inquilinos" role="tabpanel"> <div id="tenants-list-view"><div class="card shadow-sm"><div class="card-header d-flex justify-content-between align-items-center"><h2 class="h5 mb-0">Lista de Inquilinos</h2><button id="show-tenant-form-btn" class="btn btn-primary"><i class="bi bi-plus-circle me-2"></i>Criar Novo Inquilino</button></div><div class="card-body"><div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Nome</th><th>Quarto</th><th class="text-center">Estado</th><th class="text-end">Ações</th></tr></thead><tbody id="tenants-table-body"></tbody></table></div></div></div></div><div id="tenants-form-view" class="d-none"><div class="card shadow-sm"><div class="card-header"><h2 class="h5 mb-0" id="tenant-form-title"></h2></div><div class="card-body"><form id="tenant-form" novalidate><input type="hidden" id="tenant-id"><div class="row g-3"><div class="col-md-6"><label for="tenant-name" class="form-label">Nome</label><input type="text" id="tenant-name" class="form-control" required></div><div class="col-md-6"><label for="tenant-age" class="form-label">Idade</label><input type="number" id="tenant-age" class="form-control" required></div><div class="col-md-6"><label for="tenant-gender" class="form-label">Sexo</label><select id="tenant-gender" class="form-select" required><option value="">Selecione...</option><option>Masculino</option><option>Feminino</option><option>Outro</option></select></div><div class="col-md-6"><label for="tenant-email" class="form-label">Email</label><input type="email" id="tenant-email" class="form-control" required></div><div class="col-md-6"><label for="tenant-nif" class="form-label">NIF (Opcional)</label><input type="text" id="tenant-nif" class="form-control"></div><div class="col-md-6"><label for="tenant-room" class="form-label">Quarto</label><select id="tenant-room" class="form-select" required></select></div></div><div class="mt-4 d-flex justify-content-end"><button type="button" id="tenant-form-cancel" class="btn btn-secondary me-2">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div></form></div></div></div></div>
+                    <div class="tab-pane fade" id="tab-quartos" role="tabpanel"> <div id="rooms-list-view"><div class="card shadow-sm"><div class="card-header d-flex justify-content-between align-items-center"><h2 class="h5 mb-0">Lista de Quartos</h2><button id="show-room-form-btn" class="btn btn-primary"><i class="bi bi-plus-circle me-2"></i>Criar Novo Quarto</button></div><div class="card-body"><div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Nome</th><th class="text-end">Preço</th><th class="text-center">Estado</th><th class="text-center">Ocupação</th><th class="text-end">Ações</th></tr></thead><tbody id="rooms-table-body"></tbody></table></div></div></div></div><div id="rooms-form-view" class="d-none"><div class="card shadow-sm"><div class="card-header"><h2 class="h5 mb-0" id="room-form-title"></h2></div><div class="card-body"><form id="room-form" novalidate><input type="hidden" id="room-id"><div class="mb-3"><label for="room-name" class="form-label">Nome do Quarto</label><input type="text" id="room-name" class="form-control" required></div><div class="mb-3"><label for="room-price" class="form-label">Preço (€)</label><input type="number" step="0.01" id="room-price" class="form-control" required></div><div class="mt-4 d-flex justify-content-end"><button type="button" id="room-form-cancel" class="btn btn-secondary me-2">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div></form></div></div></div></div>
+                    <div class="tab-pane fade" id="tab-relatorio" role="tabpanel"> <div id="house-expenses-list-view"><div class="card shadow-sm"><div class="card-header d-flex justify-content-between align-items-center"><h2 class="h5 mb-0">Despesas Mensais da Casa</h2><button id="show-house-expense-form-btn" class="btn btn-primary"><i class="bi bi-plus-circle me-2"></i>Criar Despesa Mensal</button></div><div class="card-body"><div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Ano</th><th>Mês</th><th class="text-end">Gás (€)</th><th class="text-end">Água (€)</th><th class="text-end">Eletricidade (€)</th><th class="text-end">Ações</th></tr></thead><tbody id="house-expenses-table-body"></tbody></table></div></div></div></div><div id="house-expenses-form-view" class="d-none"><div class="card shadow-sm"><div class="card-header"><h2 class="h5 mb-0" id="house-expense-form-title"></h2></div><div class="card-body"><form id="house-expense-form" novalidate><input type="hidden" id="house-expense-id"><div class="row g-3"><div class="col-md-6"><label for="house-expense-year" class="form-label">Ano</label><input type="number" id="house-expense-year" class="form-control" required></div><div class="col-md-6"><label for="house-expense-month" class="form-label">Mês</label><select id="house-expense-month" class="form-select" required><option value="">Selecione...</option><option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">Março</option><option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option><option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option><option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option></select></div><div class="col-md-4"><label for="house-expense-gas" class="form-label">Gás (€)</label><input type="number" step="0.01" id="house-expense-gas" class="form-control" required></div><div class="col-md-4"><label for="house-expense-water" class="form-label">Água (€)</label><input type="number" step="0.01" id="house-expense-water" class="form-control" required></div><div class="col-md-4"><label for="house-expense-electricity" class="form-label">Eletricidade (€)</label><input type="number" step="0.01" id="house-expense-electricity" class="form-control" required></div></div><div class="mt-4 d-flex justify-content-end"><button type="button" id="house-expense-form-cancel" class="btn btn-secondary me-2">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div></form></div></div></div></div>
+                </div>
+            </div>
+            <div class="modal fade" id="expense-modal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Editar Despesas do Inquilino</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="expense-form"><input type="hidden" id="report-id"><div class="mb-3"><label for="expense-gas" class="form-label">Gás (€)</label><input type="number" step="0.01" id="expense-gas" class="form-control"></div><div class="mb-3"><label for="expense-water" class="form-label">Água (€)</label><input type="number" step="0.01" id="expense-water" class="form-control"></div><div class="mb-3"><label for="expense-electricity" class="form-label">Eletricidade (€)</label><input type="number" step="0.01" id="expense-electricity" class="form-control"></div></form></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button><button type="button" id="save-expense-btn" class="btn btn-primary">Guardar Alterações</button></div></div></div></div>
+            <div class="modal fade" id="confirm-modal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="confirm-modal-title"></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="confirm-modal-body"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button><button type="button" id="confirm-modal-btn" class="btn btn-danger">Confirmar</button></div></div></div></div>
+            <div class="modal fade" id="email-selection-modal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Selecionar Destinatários</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="email-selection-modal-body"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button><button type="button" id="confirm-send-btn" class="btn btn-primary">Enviar Emails</button></div></div></div></div>
+        `;
+
+        async function main() {
+            let firebaseConfig;
+            try {
+                const response = await fetch("/api/firebase-config");
+                if (!response.ok) { throw new Error("Network response was not ok."); }
+                firebaseConfig = await response.json();
+                if (!firebaseConfig.apiKey) { throw new Error("API Key not found in config from server."); }
+            } catch (error) { 
+                console.error("Error fetching Firebase config:", error);
+                document.getElementById("app-root").innerHTML = `<div class="vh-100 d-flex justify-content-center align-items-center"><div class="text-center alert alert-danger"><h1>Erro de Configuração</h1><p>Não foi possível carregar a configuração do Firebase. O servidor backend está a correr? O ficheiro .env está correto?</p></div></div>`;
+                return;
+            }
+
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            const appContainer = document.getElementById("app-container");
+            const loginContainer = document.getElementById("login-container");
+            const appToast = new bootstrap.Toast(document.getElementById("app-toast"));
+            const showToast = (message, isError = false) => { document.querySelector("#app-toast .toast-body").textContent = message; appToast.show(); };
+
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    appContainer.innerHTML = appHTML;
+                    document.getElementById("user-email").textContent = user.email;
+                    loginContainer.classList.add("d-none");
+                    appContainer.classList.remove("d-none");
+                    runAuthenticatedApp(getFirestore(app), auth, showToast);
+                } else {
+                    appContainer.classList.add("d-none");
+                    loginContainer.classList.remove("d-none");
+                    appContainer.innerHTML = "";
+                }
+            });
+
+            document.getElementById("login-form").addEventListener("submit", async (e) => {
+                e.preventDefault();
+                const email = document.getElementById("login-email").value;
+                const password = document.getElementById("login-password").value;
+                try {
+                    await signInWithEmailAndPassword(auth, email, password);
+                } catch (error) {
+                    showToast("Email ou password inválidos.", true);
+                }
+            });
+        }
+
+        function runAuthenticatedApp(db, auth, showToast) {
+            const N8N_WEBHOOK_URL = "";
+            const expenseModal = new bootstrap.Modal(document.getElementById("expense-modal"));
+            const confirmModal = new bootstrap.Modal(document.getElementById("confirm-modal"));
+            const emailSelectionModal = new bootstrap.Modal(document.getElementById("email-selection-modal"));
+            const formatCurrency = (value) => new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(value || 0);
+
+            document.getElementById("logout-btn").addEventListener("click", () => signOut(auth));
+
+            const showConfirmModal = (title, body, onConfirm) => {
+                document.getElementById("confirm-modal-title").textContent = title;
+                document.getElementById("confirm-modal-body").textContent = body;
+                const confirmBtn = document.getElementById("confirm-modal-btn");
+                const newConfirmBtn = confirmBtn.cloneNode(true);
+                confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+                newConfirmBtn.addEventListener("click", () => { onConfirm(); confirmModal.hide(); });
+                confirmModal.show();
+            };
+
+            const setupViewToggling = (listViewId, formViewId, showFormBtnId, formId, formCancelBtnId, formTitleId, newTitle, editTitle) => {
+                const [listView, formView, showFormBtn, form, cancelBtn, formTitle] = [listViewId, formViewId, showFormBtnId, formId, formCancelBtnId, formTitleId].map(id => document.getElementById(id));
+                const showListView = () => { listView.classList.remove("d-none"); formView.classList.add("d-none"); };
+                const showFormView = (isEditing = false) => { formTitle.textContent = isEditing ? editTitle : newTitle; listView.classList.add("d-none"); formView.classList.remove("d-none"); };
+                showFormBtn.addEventListener("click", () => { form.reset(); form.querySelector("input[type=\"hidden\"]").value = ""; if(formId === 'tenant-form') { populateRoomDropdown(allRooms, new Set(allTenants.filter(t => t.active && t.room).map(t => t.room))); } showFormView(false); });
+                cancelBtn.addEventListener("click", showListView);
+                return { showListView, showFormView };
+            };
+            const { showListView: showRoomsListView, showFormView: showRoomsFormView } = setupViewToggling('rooms-list-view', 'rooms-form-view', 'show-room-form-btn', 'room-form', 'room-form-cancel', 'room-form-title', 'Criar Novo Quarto', 'Editar Quarto');
+            const { showListView: showTenantsListView, showFormView: showTenantsFormView } = setupViewToggling('tenants-list-view', 'tenants-form-view', 'show-tenant-form-btn', 'tenant-form', 'tenant-form-cancel', 'tenant-form-title', 'Criar Novo Inquilino', 'Editar Inquilino');
+            const { showListView: showHouseExpensesListView, showFormView: showHouseExpensesFormView } = setupViewToggling('house-expenses-list-view', 'house-expenses-form-view', 'show-house-expense-form-btn', 'house-expense-form', 'house-expense-form-cancel', 'house-expense-form-title', 'Criar Despesa Mensal', 'Editar Despesa Mensal');
+
+            function validateForm(form) { for (const field of form.querySelectorAll('[required]')) { if (!field.value) { showToast(`O campo "${field.labels[0].textContent}" é obrigatório.`); field.focus(); return false; } } return true; }
+
+            let allRooms = [];
+            let allTenants = [];
+
+            onSnapshot(collection(db, 'tenants'), (snap) => { allTenants = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderState(); });
+            onSnapshot(collection(db, 'rooms'), (snap) => { allRooms = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderState(); });
+            onSnapshot(query(collection(db, 'house_expenses')), (snap) => renderHouseExpensesTable(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+            
+            function renderState() { const occupiedRooms = new Set(allTenants.filter(t => t.active && t.room).map(t => t.room)); renderTenantsTable(allTenants); renderRoomsTable(allRooms, occupiedRooms); populateRoomDropdown(allRooms, occupiedRooms); }
+            function renderTenantsTable(tenants) { let h = ''; tenants.forEach(t => { h += `<tr><td>${t.name}</td><td>${t.room || 'N/A'}</td><td class="text-center"><span class="badge ${t.active ? 'bg-success' : 'bg-danger'}">${t.active ? 'Ativo' : 'Inativo'}</span></td><td class="text-end"><button class="btn btn-sm btn-outline-primary" onclick="window.editTenant('${t.id}')"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-outline-secondary ms-2" onclick="window.toggleTenantStatus('${t.id}', ${t.active})">${t.active ? 'Desativar' : 'Ativar'}</button></td></tr>`; }); document.getElementById('tenants-table-body').innerHTML = h || '<tr><td colspan="4" class="text-center p-4 text-muted">Nenhum inquilino encontrado.</td></tr>'; }
+            function renderRoomsTable(rooms, occupiedRooms) { let h = ''; rooms.sort((a,b) => a.name.localeCompare(b.name)).forEach(r => { const isOccupied = occupiedRooms.has(r.name); h += `<tr><td>${r.name}</td><td class="text-end">${formatCurrency(r.price)}</td><td class="text-center"><span class="badge ${r.active ? 'bg-success' : 'bg-danger'}">${r.active ? 'Ativo' : 'Inativo'}</span></td><td class="text-center"><span class="badge ${isOccupied ? 'bg-secondary' : 'bg-primary'}">${isOccupied ? 'Ocupado' : 'Livre'}</span></td><td class="text-end"><button class="btn btn-sm btn-outline-primary" onclick="window.editRoom('${r.id}')"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-outline-secondary ms-2" onclick="window.toggleRoomStatus('${r.id}', ${r.active})">${r.active ? 'Desativar' : 'Ativar'}</button></td></tr>`; }); document.getElementById('rooms-table-body').innerHTML = h || '<tr><td colspan="5" class="text-center p-4 text-muted">Nenhum quarto encontrado.</td></tr>'; }
+            function populateRoomDropdown(rooms, occupiedRooms, selectedRoom = null) { const dropdown = document.getElementById('tenant-room'); let opts = '<option value="">Selecione um quarto</option>'; rooms.forEach(r => { const isOccupied = occupiedRooms.has(r.name); if (r.active && (!isOccupied || r.name === selectedRoom)) { opts += `<option value="${r.name}">${r.name}</option>`; } }); dropdown.innerHTML = opts; }
+            function renderHouseExpensesTable(expenses) { const tableBody = document.getElementById('house-expenses-table-body'); let html = ''; const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]; expenses.sort((a, b) => (b.year - a.year) || (b.month - a.month)).forEach(expense => { html += `<tr><td>${expense.year}</td><td>${monthNames[expense.month - 1]}</td><td class="text-end">${formatCurrency(expense.gas)}</td><td class="text-end">${formatCurrency(expense.water)}</td><td class="text-end">${formatCurrency(expense.electricity)}</td><td class="text-end"><button class="btn btn-sm btn-outline-primary" onclick="window.editHouseExpense('${expense.id}')"><i class="bi bi-pencil"></i></button></td></tr>`; }); tableBody.innerHTML = html || '<tr><td colspan="6" class="text-center p-4 text-muted">Nenhuma despesa da casa encontrada.</td></tr>'; }
+
+            window.editTenant = async (id) => { const docSnap = await getDoc(doc(db, 'tenants', id)); if (!docSnap.exists()) return; const tenant = docSnap.data(); const occupiedRooms = new Set(allTenants.filter(t => t.active && t.room).map(t => t.room)); populateRoomDropdown(allRooms, occupiedRooms, tenant.room); const form = document.getElementById('tenant-form'); form.querySelector('#tenant-id').value = id; form.querySelector('#tenant-name').value = tenant.name; form.querySelector('#tenant-age').value = tenant.age; form.querySelector('#tenant-gender').value = tenant.gender; form.querySelector('#tenant-email').value = tenant.email; form.querySelector('#tenant-nif').value = tenant.nif; form.querySelector('#tenant-room').value = tenant.room; showTenantsFormView(true); };
+            document.getElementById('tenant-form').addEventListener('submit', async (e) => { e.preventDefault(); const form = e.target; if (!validateForm(form)) return; const id = form.querySelector('#tenant-id').value; const data = { name: form.querySelector('#tenant-name').value, age: form.querySelector('#tenant-age').value, gender: form.querySelector('#tenant-gender').value, email: form.querySelector('#tenant-email').value, nif: form.querySelector('#tenant-nif').value, room: form.querySelector('#tenant-room').value }; if (id) { await updateDoc(doc(db, 'tenants', id), data); } else { data.active = true; await addDoc(collection(db, 'tenants'), data); } form.reset(); form.querySelector('#tenant-id').value = ''; showTenantsListView(); });
+            window.toggleTenantStatus = (id, s) => { showConfirmModal('Alterar Estado do Inquilino', 'Tem a certeza que quer alterar o estado deste inquilino?', async () => { await updateDoc(doc(db, 'tenants', id), { active: !s }); showToast('Estado do inquilino alterado.'); }); };
+            
+            window.editRoom = async (id) => { const d = await getDoc(doc(db, 'rooms', id)); if (d.exists()) { const r = d.data(); const form = document.getElementById('room-form'); form.querySelector('#room-id').value = id; form.querySelector('#room-name').value = r.name; form.querySelector('#room-price').value = r.price; showRoomsFormView(true); } };
+            document.getElementById('room-form').addEventListener('submit', async (e) => { e.preventDefault(); const form = e.target; if (!validateForm(form)) return; const id = form.querySelector('#room-id').value; const data = { name: form.querySelector('#room-name').value, price: parseFloat(form.querySelector('#room-price').value) }; if (id) { await updateDoc(doc(db, 'rooms', id), data); } else { data.active = true; await addDoc(collection(db, 'rooms'), data); } form.reset(); form.querySelector('#room-id').value = ''; showRoomsListView(); });
+            window.toggleRoomStatus = (id, s) => { showConfirmModal('Alterar Estado do Quarto', 'Tem a certeza que quer alterar o estado deste quarto?', async () => { await updateDoc(doc(db, 'rooms', id), { active: !s }); showToast('Estado do quarto alterado.'); }); };
+
+            window.editHouseExpense = async (id) => { const docSnap = await getDoc(doc(db, 'house_expenses', id)); if (docSnap.exists()) { const expense = docSnap.data(); document.getElementById('house-expense-id').value = id; document.getElementById('house-expense-year').value = expense.year; document.getElementById('house-expense-month').value = expense.month; document.getElementById('house-expense-gas').value = expense.gas; document.getElementById('house-expense-water').value = expense.water; document.getElementById('house-expense-electricity').value = expense.electricity; showHouseExpensesFormView(true); } };
+            document.getElementById('house-expense-form').addEventListener('submit', async (e) => { e.preventDefault(); const form = e.target; if (!validateForm(form)) return; const id = form.querySelector('#house-expense-id').value; const data = { year: parseInt(form.querySelector('#house-expense-year').value), month: parseInt(form.querySelector('#house-expense-month').value), gas: parseFloat(form.querySelector('#house-expense-gas').value) || 0, water: parseFloat(form.querySelector('#house-expense-water').value) || 0, electricity: parseFloat(form.querySelector('#house-expense-electricity').value) || 0, }; if (id) { await updateDoc(doc(db, 'house_expenses', id), data); showToast('Despesa da casa atualizada! A recalcular relatórios...'); await recalculateUnpaidReports(data.year, data.month); } else { await addDoc(collection(db, 'house_expenses'), data); showToast('Despesa da casa guardada com sucesso!'); } form.reset(); showHouseExpensesListView(); });
+
+            async function recalculateUnpaidReports(year, month) { const houseExpense = { year, month, gas: parseFloat(document.getElementById('house-expense-gas').value), water: parseFloat(document.getElementById('house-expense-water').value), electricity: parseFloat(document.getElementById('house-expense-electricity').value) }; const activeTenants = allTenants.filter(t => t.active); if (activeTenants.length === 0) return; const activeTenantCount = activeTenants.length; const roomsData = Object.fromEntries(allRooms.map(r => [r.name, r.price])); const sharedGas = activeTenantCount > 0 ? houseExpense.gas / activeTenantCount : 0; const sharedWater = activeTenantCount > 0 ? houseExpense.water / activeTenantCount : 0; const sharedElectricity = activeTenantCount > 0 ? houseExpense.electricity / activeTenantCount : 0; const monthString = `${year}-${String(month).padStart(2, '0')}`; const reportsQuery = query(collection(db, 'monthly_reports'), where('month', '==', monthString), where('status', '==', 'nao_pago')); const reportsSnap = await getDocs(reportsQuery); if (reportsSnap.empty) return; const batch = writeBatch(db); for (const reportDoc of reportsSnap.docs) { const report = reportDoc.data(); const rent = roomsData[report.roomName] || 0; const reportRef = doc(db, 'monthly_reports', reportDoc.id); batch.update(reportRef, { rent, gas: sharedGas, water: sharedWater, electricity: sharedElectricity }); } await batch.commit(); showToast(`Relatórios não pagos de ${monthString} foram recalculados.`); }
+
+            const yearFilter = document.getElementById('year-filter');
+            const monthFilter = document.getElementById('month-filter');
+            const currentYear = new Date().getFullYear();
+            for (let i = currentYear - 2; i <= currentYear + 2; i++) { yearFilter.innerHTML += `<option value="${i}">${i}</option>`; }
+            yearFilter.value = currentYear;
+            monthFilter.value = new Date().getMonth() + 1;
+            
+            function renderDashboard() { const year = yearFilter.value; const month = monthFilter.value; const monthString = `${year}-${String(month).padStart(2, '0')}`; const q = query(collection(db, "monthly_reports"), where("month", "==", monthString)); onSnapshot(q, (snapshot) => { let html = ''; snapshot.docs.sort((a, b) => a.data().tenantName.localeCompare(b.data().tenantName)).forEach(doc => { const report = { id: doc.id, ...doc.data() }; const total = (report.rent || 0) + (report.gas || 0) + (report.water || 0) + (report.electricity || 0); const isPaid = report.status === 'pago'; html += `<tr><td>${report.tenantName}</td><td>${report.month}</td><td class="text-end">${formatCurrency(report.rent)}</td><td class="text-end">${formatCurrency(report.gas)}</td><td class="text-end">${formatCurrency(report.water)}</td><td class="text-end">${formatCurrency(report.electricity)}</td><td class="text-end fw-bold">${formatCurrency(total)}</td><td class="text-center"><span class="badge ${isPaid ? 'bg-success' : 'bg-warning'}">${isPaid ? 'Pago' : 'Não Pago'}</span></td><td class="text-center">${report.emailSent ? '<i class="bi bi-check-circle-fill text-success"></i>' : ''}</td><td class="text-end"><button class="btn btn-sm btn-outline-danger" onclick="window.deleteTenantReport('${report.id}')"><i class="bi bi-trash"></i></button><button class="btn btn-sm ${isPaid ? 'btn-outline-secondary' : 'btn-outline-success'} ms-2" onclick="window.togglePaymentStatus('${report.id}', '${report.status}')">${isPaid ? 'Marcar Não Pago' : 'Marcar Pago'}</button></td></tr>`; }); document.getElementById('reports-table-body').innerHTML = html || `<tr><td colspan="10" class="text-center p-4 text-muted">Nenhum relatório para ${monthString}.</td></tr>`; }); }
+            yearFilter.addEventListener('change', renderDashboard);
+            monthFilter.addEventListener('change', renderDashboard);
+            renderDashboard();
+
+            window.deleteTenantReport = (id) => { showConfirmModal('Apagar Relatório', 'Tem a certeza que quer apagar permanentemente este relatório de inquilino?', async () => { await deleteDoc(doc(db, 'monthly_reports', id)); showToast('Relatório apagado com sucesso.'); }); };
+            document.getElementById('generate-reports-btn').addEventListener('click', () => { showConfirmModal('Calcular & Gerar Relatórios', 'Tem a certeza? Isto irá (re)calcular as despesas para todos os inquilinos ativos e substituirá os relatórios existentes para o mês selecionado.', async () => { const year = yearFilter.value; const month = monthFilter.value; const houseExpensesQuery = query(collection(db, 'house_expenses'), where('year', '==', parseInt(year)), where('month', '==', parseInt(month))); const houseExpensesSnap = await getDocs(houseExpensesQuery); if (houseExpensesSnap.empty) { showToast('ERRO: Crie primeiro a despesa geral para este mês na aba \'Relatório de Despesas\'.'); return; } const houseExpense = houseExpensesSnap.docs[0].data(); const activeTenants = allTenants.filter(t => t.active); if (activeTenants.length === 0) { showToast('Não existem inquilinos ativos para gerar relatórios.'); return; } const activeTenantCount = activeTenants.length; const roomsData = Object.fromEntries(allRooms.map(r => [r.name, r.price])); const sharedGas = activeTenantCount > 0 ? houseExpense.gas / activeTenantCount : 0; const sharedWater = activeTenantCount > 0 ? houseExpense.water / activeTenantCount : 0; const sharedElectricity = activeTenantCount > 0 ? houseExpense.electricity / activeTenantCount : 0; const batch = writeBatch(db); const monthString = `${year}-${String(month).padStart(2, '0')}`; const reportsQuery = query(collection(db, 'monthly_reports'), where('month', '==', monthString)); const reportsSnap = await getDocs(reportsQuery); const existingReportsMap = new Map(reportsSnap.docs.map(doc => [doc.data().tenantId, doc.id])); for (const tenant of activeTenants) { const rent = roomsData[tenant.room] || 0; const reportData = { tenantId: tenant.id, tenantName: tenant.name, month: monthString, roomName: tenant.room, rent, gas: sharedGas, water: sharedWater, electricity: sharedElectricity, status: 'nao_pago', emailSent: false }; const existingReportId = existingReportsMap.get(tenant.id); const reportRef = existingReportId ? doc(db, 'monthly_reports', existingReportId) : doc(collection(db, 'monthly_reports')); batch.set(reportRef, reportData, { merge: true }); } await batch.commit(); showToast(`Relatórios para ${activeTenantCount} inquilino(s) foram calculados e guardados para ${monthString}.`); }); });
+            document.getElementById('email-reports-btn').addEventListener('click', async () => { const year = yearFilter.value; const month = monthFilter.value; const monthString = `${year}-${String(month).padStart(2, '0')}`; const reportsQuery = query(collection(db, 'monthly_reports'), where('month', '==', monthString)); const reportsSnap = await getDocs(reportsQuery); if (reportsSnap.empty) { showToast('Não existem relatórios para o mês selecionado.'); return; } const modalBody = document.getElementById('email-selection-modal-body'); modalBody.innerHTML = '<div class="mb-3"><input type="checkbox" id="select-all-emails" class="form-check-input me-2"><label for="select-all-emails" class="form-check-label">Selecionar Todos</label></div>'; reportsSnap.forEach(doc => { const report = { id: doc.id, ...doc.data() }; const isUnpaid = report.status === 'nao_pago'; modalBody.innerHTML += `<div class="form-check"><input class="form-check-input email-report-checkbox" type="checkbox" value="${report.id}" id="report-${report.id}" ${isUnpaid && !report.emailSent ? 'checked' : ''}><label class="form-check-label" for="report-${report.id}">${report.tenantName} <span class="badge ${isUnpaid ? 'bg-warning' : 'bg-success'}">${isUnpaid ? 'Não Pago' : 'Pago'}</span> ${report.emailSent ? '<span class="badge bg-info">Email Enviado</span>' : ''}</label></div>`; }); emailSelectionModal.show(); document.getElementById('select-all-emails').addEventListener('change', (e) => { modalBody.querySelectorAll('.email-report-checkbox').forEach(checkbox => checkbox.checked = e.target.checked); }); });
+            document.getElementById('confirm-send-btn').addEventListener('click', () => { const selectedIds = Array.from(document.querySelectorAll('#email-selection-modal-body .email-report-checkbox:checked')).map(cb => cb.value); if (selectedIds.length === 0) { showToast('Nenhum relatório selecionado para envio.'); return; } showConfirmModal('Confirmar Envio', `Tem a certeza que quer enviar ${selectedIds.length} email(s)?`, async () => { if (!N8N_WEBHOOK_URL) { showToast('O URL do webhook do n8n não está configurado no script.'); return; } const reportsToSend = []; const batch = writeBatch(db); for (const id of selectedIds) { const docSnap = await getDoc(doc(db, 'monthly_reports', id)); if (docSnap.exists()) { const reportData = docSnap.data(); const total = (reportData.rent || 0) + (reportData.gas || 0) + (reportData.water || 0) + (reportData.electricity || 0); const tenant = allTenants.find(t => t.id === reportData.tenantId); const tenantEmail = tenant ? tenant.email : ''; reportsToSend.push({ ...reportData, total, id, tenantEmail }); const reportRef = doc(db, 'monthly_reports', id); batch.update(reportRef, { emailSent: true }); } } /* fetch(N8N_WEBHOOK_URL, { method: 'POST', body: JSON.stringify({ reports: reportsToSend }) }); */ await batch.commit(); showToast(`${selectedIds.length} email(s) foram enviados para a fila de processamento do n8n.`); emailSelectionModal.hide(); }); });
+            window.togglePaymentStatus = (id, currentStatus) => { showConfirmModal('Alterar Estado de Pagamento', 'Tem a certeza que quer alterar o estado de pagamento deste relatório?', async () => { const newStatus = currentStatus === 'pago' ? 'nao_pago' : 'pago'; await updateDoc(doc(db, 'monthly_reports', id), { status: newStatus }); showToast('Estado de pagamento atualizado.'); }); };
+            window.editExpenses = async (id) => { const d = await getDoc(doc(db, 'monthly_reports', id)); if (d.exists()) { const r = d.data(); document.getElementById('report-id').value = id; document.getElementById('expense-gas').value = r.gas || 0; document.getElementById('expense-water').value = r.water || 0; document.getElementById('expense-electricity').value = r.electricity || 0; expenseModal.show(); } };
+            document.getElementById('save-expense-btn').addEventListener('click', () => { showConfirmModal('Guardar Despesas', 'Tem a certeza que quer guardar estas alterações nas despesas?', async () => { const id = document.getElementById('report-id').value; const data = { gas: parseFloat(document.getElementById('expense-gas').value) || 0, water: parseFloat(document.getElementById('expense-water').value) || 0, electricity: parseFloat(document.getElementById('expense-electricity').value) || 0 }; await updateDoc(doc(db, 'monthly_reports', id), data); expenseModal.hide(); showToast('Despesas atualizadas com sucesso!'); }); });
+        }
+
+        main();
+    </script>
+</body>
+</html>
