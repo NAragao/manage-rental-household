@@ -1,156 +1,156 @@
-# 🏠 Gestão da Casa
+# 🏠 House Management
 
-Um sistema simples e elegante para gerir inquilinos, quartos e despesas mensais de uma casa, com integração Firebase e automatização de emails via n8n.
-
----
-
-## ✨ Funcionalidades
-
-*   **Dashboard Interativo:** Visualize e gere relatórios de despesas mensais por inquilino.
-*   **Gestão de Inquilinos:** Crie, edite, ative/desative inquilinos com dados detalhados.
-*   **Gestão de Quartos:** Crie, edite quartos e visualize o seu estado de ocupação.
-*   **Relatório de Despesas da Casa:** Registe e edite as despesas gerais mensais da casa (gás, água, eletricidade).
-*   **Cálculo Automático de Despesas:** Calcule e distribua as despesas gerais pelos inquilinos ativos.
-*   **Envio de Emails Personalizados:** Selecione e envie emails de despesas aos inquilinos via n8n.
-*   **Autenticação Segura:** Protegido por login de utilizador via Firebase Authentication.
-*   **Design Moderno:** Interface apelativa e responsiva com Bootstrap 5.
+A simple and elegant system to manage tenants, rooms, and monthly house expenses, with Firebase integration and email automation via n8n.
 
 ---
 
-## 🚀 Pré-requisitos
+## ✨ Features
 
-Antes de começar, certifique-se de que tem o seguinte instalado:
-
-*   **Node.js e npm:** [Download aqui](https://nodejs.org/en/download/)
-*   **Conta Firebase:** Um projeto Firebase configurado com **Firestore Database** e **Authentication (Email/Password)** ativados.
-*   **Instância n8n (Opcional):** Para a funcionalidade de envio de emails. Pode ser local ou cloud.
+*   **Interactive Dashboard:** View and manage monthly expense reports per tenant.
+*   **Tenant Management:** Create, edit, activate/deactivate tenants with detailed data.
+*   **Room Management:** Create, edit rooms and view their occupancy status.
+*   **House Expense Report:** Record and edit general monthly house expenses (gas, water, electricity).
+*   **Automatic Expense Calculation:** Calculate and distribute general expenses among active tenants.
+*   **Personalized Email Sending:** Select and send expense emails to tenants via n8n.
+*   **Secure Authentication:** Protected by user login via Firebase Authentication.
+*   **Modern Design:** Appealing and responsive interface with Bootstrap 5.
 
 ---
 
-## ⚙️ Configuração do Projeto
+## 🚀 Prerequisites
 
-Siga estes passos para configurar o projeto no seu ambiente local:
+Before you begin, ensure you have the following installed:
 
-1.  **Clone o Repositório / Descarregue os Ficheiros:**
+*   **Node.js and npm:** [Download here](https://nodejs.org/en/download/)
+*   **Firebase Account:** A Firebase project configured with **Firestore Database** and **Authentication (Email/Password)** enabled.
+*   **n8n Instance (Optional):** For email sending functionality. Can be local or cloud.
+
+---
+
+## ⚙️ Project Setup
+
+Follow these steps to set up the project in your local environment:
+
+1.  **Clone the Repository / Download the Files:**
     ```bash
-    git clone <URL_DO_SEU_REPOSITORIO>
-    # OU descarregue os ficheiros diretamente para uma pasta
+    git clone <YOUR_REPOSITORY_URL>
+    # OR download the files directly to a folder
     ```
 
-2.  **Instale as Dependências:**
-    Navegue até à pasta do projeto no seu terminal e execute:
+2.  **Install Dependencies:**
+    Navigate to the project folder in your terminal and run:
     ```bash
     npm install
     ```
 
-3.  **Configure o Ficheiro `.env`:**
-    Este ficheiro contém as suas credenciais do Firebase e **NÃO DEVE SER PARTILHADO PUBLICAMENTE (ex: GitHub)**.
+3.  **Configure the `.env` File:**
+    This file contains your Firebase credentials and **SHOULD NOT BE SHARED PUBLICLY (e.g., GitHub)**.
 
-    *   Crie uma cópia do ficheiro `.env.example` e renomeie-a para `.env`.
-    *   Abra o ficheiro `.env` e preencha com as suas credenciais do Firebase. Pode encontrá-las no seu [Firebase Console](https://console.firebase.google.com/) em **Project settings (⚙️) > General > Your apps > Web app > Config**.
+    *   Create a copy of the `.env.example` file and rename it to `.env`.
+    *   Open the `.env` file and fill in your Firebase credentials. You can find them in your [Firebase Console](https://console.firebase.google.com/) under **Project settings (⚙️) > General > Your apps > Web app > Config**.
 
     ```env
-    API_KEY="SEU_API_KEY"
-    AUTH_DOMAIN="SEU_AUTH_DOMAIN"
-    PROJECT_ID="SEU_PROJECT_ID"
-    STORAGE_BUCKET="SEU_STORAGE_BUCKET"
-    MESSAGING_SENDER_ID="SEU_MESSAGING_SENDER_ID"
-    APP_ID="SEU_APP_ID"
-    MEASUREMENT_ID="SEU_MEASUREMENT_ID"
+    API_KEY="YOUR_API_KEY"
+    AUTH_DOMAIN="YOUR_AUTH_DOMAIN"
+    PROJECT_ID="YOUR_PROJECT_ID"
+    STORAGE_BUCKET="YOUR_STORAGE_BUCKET"
+    MESSAGING_SENDER_ID="YOUR_MESSAGING_SENDER_ID"
+    APP_ID="YOUR_APP_ID"
+    MEASUREMENT_ID="YOUR_MEASUREMENT_ID"
     ```
 
-4.  **Configure as Regras de Segurança do Firebase Firestore:**
-    Para permitir que a aplicação leia e escreva dados após o login, configure as suas regras do Firestore.
+4.  **Configure Firebase Firestore Security Rules:**
+    To allow the application to read and write data after login, configure your Firestore rules.
 
-    *   No [Firebase Console](https://console.firebase.google.com/), vá a **Build > Firestore Database > Rules**.
-    *   Substitua o conteúdo existente pelas seguintes regras e clique em **Publicar**:
+    *   In the [Firebase Console](https://console.firebase.google.com/), go to **Build > Firestore Database > Rules**.
+    *   Replace the existing content with the following rules and click **Publish**:
 
     ```firestore
     rules_version = '2';
     service cloud.firestore {
       match /databases/{database}/documents {
         match /{document=**} {
-          // Permite ler e escrever APENAS se o pedido vier de um utilizador autenticado.
+          // Allows read and write ONLY if the request comes from an authenticated user.
           allow read, write: if request.auth != null;
         }
       }
     }
     ```
 
-5.  **Crie o seu Utilizador Administrador no Firebase:**
-    *   No [Firebase Console](https://console.firebase.google.com/), vá a **Build > Authentication > Users**.
-    *   Clique em **Add user** e crie um utilizador com um email e password. Estas serão as credenciais que usará para fazer login na aplicação.
+5.  **Create your Admin User in Firebase:**
+    *   In the [Firebase Console](https://console.firebase.google.com/), go to **Build > Authentication > Users**.
+    *   Click **Add user** and create a user with an email and password. These will be the credentials you use to log in to the application.
 
 ---
 
-## ▶️ Como Correr a Aplicação
+## ▶️ How to Run the Application
 
-1.  **Inicie o Servidor:**
-    No terminal, na pasta do projeto, execute:
+1.  **Start the Server:**
+    In the terminal, in the project folder, run:
     ```bash
     node server.js
     ```
-    Deverá ver uma mensagem como: `Server running at http://localhost:3000`
+    You should see a message like: `Server running at http://localhost:3000`
 
-2.  **Aceda no Navegador:**
-    Abra o seu navegador e vá para:
+2.  **Access in Browser:**
+    Open your browser and go to:
     [http://localhost:3000](http://localhost:3000)
 
-    Será redirecionado para a página de login. Use as credenciais que criou no Firebase.
+    You will be redirected to the login page. Use the credentials you created in Firebase.
 
 ---
 
-## 📧 Configuração do n8n (Opcional: Para Envio de Emails)
+## 📧 n8n Configuration (Optional: For Email Sending)
 
-Para que o botão "Enviar Email Despesas" funcione, precisa de configurar um workflow no n8n:
+For the "Send Expense Email" button to work, you need to configure a workflow in n8n:
 
-1.  **Crie um Novo Workflow no n8n:**
-    *   Adicione um nó **Webhook** como gatilho.
-    *   Copie o **URL de Teste (Test URL)** que o nó do Webhook lhe fornece.
-    *   Cole este URL na variável `N8N_WEBHOOK_URL` no topo do script `index.html` (dentro da tag `<script type="module">`).
+1.  **Create a New Workflow in n8n:**
+    *   Add a **Webhook** node as a trigger.
+    *   Copy the **Test URL** that the Webhook node provides you.
+    *   Paste this URL into the `N8N_WEBHOOK_URL` variable at the top of the `index.html` script (inside the `<script type="module">` tag).
 
-2.  **Envie Dados de Teste da Aplicação:**
-    *   Na sua aplicação web, vá ao Dashboard, clique em "Enviar Email Despesas", selecione alguns relatórios e clique em "Enviar Emails".
-    *   No n8n, no nó do Webhook, clique em **"Fetch test event"**. Deverá ver os dados que a aplicação enviou (um array de objetos `reports`, cada um com os detalhes do relatório e o `tenantEmail`).
+2.  **Send Test Data from the Application:**
+    *   In your web application, go to the Dashboard, click "Send Expense Email", select some reports, and click "Send Emails".
+    *   In n8n, in the Webhook node, click **"Fetch test event"**. You should see the data the application sent (an array of `reports` objects, each with report details and `tenantEmail`).
 
-3.  **Construa o Workflow de Envio de Email:**
+3.  **Build the Email Sending Workflow:**
     *   **Webhook** (Trigger)
-    *   **Split In Batches** (para processar cada email individualmente, se enviar vários)
+    *   **Split In Batches** (to process each email individually, if sending multiple)
         *   `Mode`: `Split In Batches`
         *   `Batch Size`: `1`
-    *   **Gmail** (para enviar o email)
-        *   **Credencial:** Crie uma nova credencial. A forma mais segura é usar uma **App Password** da sua conta Google. [Ajuda da Google para criar App Password](https://support.google.com/accounts/answer/185833)
-        *   **To:** `{{ $json.tenantEmail }}` (ou o campo de email que obteve do nó Firebase anterior)
-        *   **Subject:** `Despesas da Casa - Mês {{ $json.month }}`
-        *   **HTML Body:** Pode usar um template como este, adaptando os campos `{{ $json.campo }}` aos dados que o seu Webhook está a receber:
+    *   **Gmail** (to send the email)
+        *   **Credential:** Create a new credential. The most secure way is to use an **App Password** from your Google account. [Google help for creating App Password](https://support.google.com/accounts/answer/185833)
+        *   **To:** `{{ $json.tenantEmail }}` (or the email field you obtained from the previous Firebase node)
+        *   **Subject:** `House Expenses - Month {{ $json.month }}`
+        *   **HTML Body:** You can use a template like this, adapting the `{{ $json.field }}` fields to the data your Webhook is receiving:
 
         ```html
-        <p>Olá {{ $json.tenantName }},</p>
-        <p>Aqui estão os detalhes das tuas despesas para o mês de <b>{{ $json.month }}</b>:</p>
+        <p>Hello {{ $json.tenantName }},</p>
+        <p>Here are the details of your expenses for the month of <b>{{ $json.month }}</b>:</p>
         <ul>
-            <li>Renda do Quarto: <b>{{ $json.rent }}€</b></li>
-            <li>Gás: {{ $json.gas }}€</li>
-            <li>Água: {{ $json.water }}€</li>
-            <li>Eletricidade: {{ $json.electricity }}€</li>
+            <li>Room Rent: <b>{{ $json.rent }}€</b></li>
+            <li>Gas: {{ $json.gas }}€</li>
+            <li>Water: {{ $json.water }}€</li>
+            <li>Electricity: {{ $json.electricity }}€</li>
         </ul>
-        <p>Total a pagar: <b>{{ $json.total }}€</b></p>
-        <p>Obrigado!</p>
+        <p>Total to pay: <b>{{ $json.total }}€</b></p>
+        <p>Thank you!</p>
         ```
-    *   **Ative o Workflow:** Depois de configurar, ative o workflow no n8n.
+    *   **Activate the Workflow:** After configuring, activate the workflow in n8n.
 
 ---
 
-## ⚠️ Resolução de Problemas Comuns
+## ⚠️ Common Troubleshooting
 
 *   **`Cannot GET /`:**
-    *   Certifique-se de que o servidor `server.js` está a correr.
-    *   Verifique se o ficheiro principal se chama `index.html` (e não `site.html`).
-*   **Login não funciona / Dados não aparecem:**
-    *   Verifique a consola do navegador (F12) para erros.
-    *   Confirme que o seu ficheiro `.env` está correto e na pasta raiz do projeto.
-    *   Certifique-se de que o método de login "Email/Password" está ativado no Firebase Authentication e que criou um utilizador.
-    *   Verifique as suas regras do Firestore. Devem ser `allow read, write: if request.auth != null;` para utilizadores autenticados.
+    *   Ensure the `server.js` server is running.
+    *   Check if the main file is named `index.html` (and not `site.html`).
+*   **Login not working / Data not appearing:**
+    *   Check the browser console (F12) for errors.
+    *   Confirm that your `.env` file is correct and in the project root folder.
+    *   Ensure "Email/Password" login method is enabled in Firebase Authentication and that you have created a user.
+    *   Check your Firestore rules. They should be `allow read, write: if request.auth != null;` for authenticated users.
 *   **`Firebase: Error (auth/invalid-api-key).`:**
-    *   A sua `API_KEY` no `.env` está incorreta ou o seu projeto Firebase não está configurado corretamente para a web.
+    *   Your `API_KEY` in `.env` is incorrect or your Firebase project is not correctly configured for the web.
 
 ---
